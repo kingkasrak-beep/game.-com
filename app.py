@@ -1,4 +1,4 @@
-# app.py - نسخه نهایی، بهینه، بدون باگ و سازگار ۱۰۰٪ با Render
+# app.py - نسخه کاملاً سازگار با python-telegram-bot 21.5 و Python 3.13 روی Render
 
 import os
 import sqlite3
@@ -14,18 +14,17 @@ from telegram.ext import (
     ConversationHandler,
 )
 
-# توکن از متغیر محیطی
+# توکن
 API_TOKEN = os.getenv("API_TOKEN")
 if not API_TOKEN:
-    raise ValueError("متغیر محیطی API_TOKEN تنظیم نشده! لطفاً در تنظیمات Render اضافه کن.")
+    raise ValueError("API_TOKEN رو در Environment Variables تنظیم کن!")
 
-# آیدی مالک ثابت - فقط این کاربر مالک است
+# مالک ثابت
 OWNER_ID = 6321580395
 
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# مراحل ثبت‌نام
 FIRST_NAME, LAST_NAME, AGE = range(3)
 
 def init_db():
@@ -48,7 +47,7 @@ def init_db():
 def is_persian(text: str) -> bool:
     if not text or not text.strip():
         return False
-    return all(0x0600 <= ord(char) <= 0x06FF or char in " \u200C" for char in text.strip())
+    return all(0x0600 <= ord(c) <= 0x06FF or c in " \u200C" for c in text.strip())
 
 def is_registered(user_id: int) -> bool:
     conn = sqlite3.connect("users.db")
@@ -69,59 +68,51 @@ def get_user_data(user_id: int):
 def is_owner(user_id: int) -> bool:
     return user_id == OWNER_ID
 
-# /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    user_id = user.id
+    user_id = update.effective_user.id
 
     if not is_registered(user_id):
         conn = sqlite3.connect("users.db")
         c = conn.cursor()
-        c.execute(
-            "INSERT INTO users (user_id, username, is_owner) VALUES (?, ?, ?)",
-            (user_id, user.username or "None", 1 if is_owner(user_id) else 0),
-        )
+        c.execute("INSERT INTO users (user_id, username, is_owner) VALUES (?, ?, ?)",
+                  (user_id, update.effective_user.username or "None", 1 if is_owner(user_id) else 0))
         conn.commit()
         conn.close()
 
         msg = "🌟 خوش اومدی!\n"
         if is_owner(user_id):
-            msg += "تو مالک اصلی ربات هستی 👑\n"
-        msg += "برای بازی در گروه باید ثبت‌نام کنی.\n\nلطفاً اسم واقعی‌ت رو فقط به فارسی بنویس:"
+            msg += "تو مالک ربات هستی 👑\n"
+        msg += "برای بازی در گروه باید ثبت‌نام کنی.\n\nاسم واقعی‌ت رو فقط به فارسی بنویس:"
         await update.message.reply_text(msg)
         return FIRST_NAME
 
-    user_data = get_user_data(user_id)
-    if not user_data or not all(user_data[:3]):
-        await update.message.reply_text("ثبت‌نامت ناتمامه! دوباره شروع کن:\nاسم خودت رو به فارسی بنویس:")
+    data = get_user_data(user_id)
+    if not data or not all(data[:3]):
+        await update.message.reply_text("ثبت‌نامت ناتمامه! دوباره اسم رو به فارسی بنویس:")
         return FIRST_NAME
 
-    first_name, last_name, age, _, is_admin = user_data
-    role = "👑 مالک" if is_owner(user_id) else "🛡️ ادمین" if is_admin else "🎮 بازیکن"
-
-    await update.message.reply_text(
-        f"سلام {first_name} {last_name}!\nنقش: {role}\n\nدر گروه از /panel استفاده کن.",
-        reply_markup=ReplyKeyboardRemove(),
-    )
+    first, last, age, _, admin = data
+    role = "👑 مالک" if is_owner(user_id) else "🛡️ ادمین" if admin else "🎮 بازیکن"
+    await update.message.reply_text(f"سلام {first} {last}!\nنقش: {role}\n\nدر گروه /panel بزن.", reply_markup=ReplyKeyboardRemove())
     return ConversationHandler.END
 
 async def first_name_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_persian(update.message.text):
-        await update.message.reply_text("❌ فقط حروف فارسی مجاز است! دوباره بنویس:")
+        await update.message.reply_text("❌ فقط حروف فارسی! دوباره بنویس:")
         return FIRST_NAME
     context.user_data["first_name"] = update.message.text.strip()
-    await update.message.reply_text("عالی! حالا فامیلی‌ت رو به فارسی بنویس:")
+    await update.message.reply_text("حالا فامیلی رو به فارسی بنویس:")
     return LAST_NAME
 
 async def last_name_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_persian(update.message.text):
-        await update.message.reply_text("❌ فقط حروف فارسی مجاز است! دوباره بنویس:")
+        await update.message.reply_text("❌ فقط حروف فارسی! دوباره بنویس:")
         return LAST_NAME
     context.user_data["last_name"] = update.message.text.strip()
 
-    keyboard = [[InlineKeyboardButton(str(age), callback_data=f"age_{age}") for age in range(start, min(start + 5, 41))] 
-                for start in range(15, 41, 5)]
-    await update.message.reply_text("سن خودت رو انتخاب کن (۱۵ تا ۴۰):", reply_markup=InlineKeyboardMarkup(keyboard))
+    keyboard = [[InlineKeyboardButton(str(a), callback_data=f"age_{a}") for a in range(s, min(s+5, 41))] 
+                for s in range(15, 41, 5)]
+    await update.message.reply_text("سنت رو انتخاب کن:", reply_markup=InlineKeyboardMarkup(keyboard))
     return AGE
 
 async def age_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -132,7 +123,7 @@ async def age_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     conn = sqlite3.connect("users.db")
     c = conn.cursor()
-    c.execute("UPDATE users SET first_name = ?, last_name = ?, age = ? WHERE user_id = ?",
+    c.execute("UPDATE users SET first_name=?, last_name=?, age=? WHERE user_id=?",
               (context.user_data["first_name"], context.user_data["last_name"], age, user_id))
     conn.commit()
     conn.close()
@@ -142,30 +133,30 @@ async def age_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"✅ ثبت‌نام تموم شد!\n\n"
         f"نام: {context.user_data['first_name']} {context.user_data['last_name']}\n"
         f"سن: {age}\n"
-        f"نقش: {role}\n\nحالا برو تو گروه و /panel بزن!"
+        f"نقش: {role}\n\nبرو تو گروه و /panel بزن!"
     )
     return ConversationHandler.END
 
 async def panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if not is_registered(user_id):
-        await update.message.reply_text("❌ اول در پی‌وی ربات /start بزن و ثبت‌نام کن!")
+        await update.message.reply_text("❌ اول در پی‌وی /start بزن و ثبت‌نام کن!")
         return
 
     data = get_user_data(user_id)
     if not data or not all(data[:3]):
-        await update.message.reply_text("❌ اطلاعاتت کامل نیست! در پی‌وی /start بزن.")
+        await update.message.reply_text("❌ اطلاعات ناقصه! در پی‌وی ثبت‌نام کن.")
         return
 
-    first_name, last_name, age, _, is_admin = data
-    role = "👑 مالک" if is_owner(user_id) else "🛡️ ادمین" if is_admin else "🎮 بازیکن"
+    first, last, age, _, admin = data
+    role = "👑 مالک" if is_owner(user_id) else "🛡️ ادمین" if admin else "🎮 بازیکن"
 
     keyboard = [[InlineKeyboardButton("📊 پروفایل", callback_data="profile")]]
     if is_owner(user_id):
-        keyboard.append([InlineKeyboardButton("➕ اضافه کردن ادمین", callback_data="add_admin_start")])
+        keyboard.append([InlineKeyboardButton("➕ ادمین جدید", callback_data="add_admin_start")])
 
     await update.message.reply_text(
-        f"🎮 پنل شخصی {first_name} {last_name}\n\nسن: {age} سال\nنقش: {role}\n\nانتخاب کن:",
+        f"🎮 پنل {first} {last}\n\nسن: {age}\nنقش: {role}\n\nانتخاب کن:",
         reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
@@ -176,18 +167,18 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if query.data == "profile":
         data = get_user_data(user_id)
-        first_name, last_name, age, _, is_admin = data
-        role = "👑 مالک" if is_owner(user_id) else "🛡️ ادمین" if is_admin else "🎮 بازیکن"
-        await query.edit_message_text(f"📊 پروفایل:\nنام: {first_name} {last_name}\nسن: {age}\nنقش: {role}")
+        first, last, age, _, admin = data
+        role = "👑 مالک" if is_owner(user_id) else "🛡️ ادمین" if admin else "🎮 بازیکن"
+        await query.edit_message_text(f"📊 پروفایل:\nنام: {first} {last}\nسن: {age}\nنقش: {role}")
 
     elif query.data == "add_admin_start":
         if not is_owner(user_id):
             await query.edit_message_text("❌ فقط مالک اجازه داره!")
             return
-        await query.edit_message_text("کاربر رو فوروارد کن یا آیدی عددی‌ش رو بفرست:\n/cancel برای لغو")
+        await query.edit_message_text("کاربر رو فوروارد کن یا آیدی عددی بده:\n/cancel برای لغو")
         return "AWAITING_ADMIN"
 
-async def awaiting_admin_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def awaiting_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.message.text == "/cancel":
         await update.message.reply_text("لغو شد.")
         return ConversationHandler.END
@@ -195,27 +186,27 @@ async def awaiting_admin_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_owner(update.effective_user.id):
         return
 
-    target_id = update.message.forward_from.id if update.message.forward_from else None
-    if not target_id and update.message.text.isdigit():
-        target_id = int(update.message.text)
+    target = update.message.forward_from.id if update.message.forward_from else None
+    if not target and update.message.text.isdigit():
+        target = int(update.message.text)
 
-    if target_id and is_registered(target_id):
+    if target and is_registered(target):
         conn = sqlite3.connect("users.db")
         c = conn.cursor()
-        c.execute("UPDATE users SET is_admin = 1 WHERE user_id = ?", (target_id,))
+        c.execute("UPDATE users SET is_admin = 1 WHERE user_id = ?", (target,))
         conn.commit()
         conn.close()
-        await update.message.reply_text(f"✅ کاربر {target_id} ادمین شد!")
+        await update.message.reply_text(f"✅ {target} حالا ادمینه!")
     else:
-        await update.message.reply_text("❌ کاربر ثبت‌نام نکرده یا پیدا نشد. دوباره امتحان کن.")
+        await update.message.reply_text("❌ کاربر ثبت‌نام نکرده. دوباره امتحان کن.")
 
     return ConversationHandler.END
 
-def main():
+async def main():
     init_db()
+
     application = Application.builder().token(API_TOKEN).build()
 
-    # ثبت‌نام
     application.add_handler(ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -226,26 +217,31 @@ def main():
         fallbacks=[],
     ))
 
-    # اضافه کردن ادمین
     application.add_handler(ConversationHandler(
         entry_points=[CallbackQueryHandler(button_handler, pattern="^add_admin_start$")],
-        states={"AWAITING_ADMIN": [MessageHandler(filters.FORWARD | filters.TEXT, awaiting_admin_id)]},
+        states={"AWAITING_ADMIN": [MessageHandler(filters.FORWARD | filters.TEXT, awaiting_admin)]},
         fallbacks=[CommandHandler("cancel", lambda u, c: ConversationHandler.END)],
     ))
 
     application.add_handler(CommandHandler("panel", panel))
     application.add_handler(CallbackQueryHandler(button_handler, pattern="^profile$"))
 
-    # Webhook
-    port = int(os.getenv("PORT", 10000))
-    webhook_url = os.getenv("RENDER_EXTERNAL_URL", "https://your-service-name.onrender.com")
+    await application.initialize()
+    await application.start()
 
-    application.run_webhook(
+    port = int(os.getenv("PORT", 10000))
+    webhook_url = os.getenv("RENDER_EXTERNAL_URL", "https://your-service.onrender.com")
+
+    await application.updater.start_webhook(
         listen="0.0.0.0",
         port=port,
         url_path=API_TOKEN,
-        webhook_url=f"{webhook_url.rstrip('/')}/{API_TOKEN}",
+        webhook_url=f"{webhook_url.rstrip('/')}/{API_TOKEN}"
     )
 
+    logger.info("ربات شروع شد و در حال اجراست...")
+    await application.updater.idle()  # نگه داشتن ربات زنده
+
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())
