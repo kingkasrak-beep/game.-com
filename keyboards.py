@@ -14,17 +14,7 @@ def age_keyboard():
 
 def faction_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="بی‌طرف", callback_data="faction:neutral")],
-        [InlineKeyboardButton(text="ارتش سرخ", callback_data="faction:red")],
-        [InlineKeyboardButton(text="جهادگران اسلامی", callback_data="faction:jihad")]
+        [InlineKeyboardButton("بی‌طرف", callback_data="faction:بی‌طرف")],
+        [InlineKeyboardButton("ارتش سرخ", callback_data="faction:ارتش سرخ")],
+        [InlineKeyboardButton("جهادگران اسلامی", callback_data="faction:جهادگران اسلامی")]
     ])
-
-
-def main_panel(is_owner=False):
-    kb = [
-        [InlineKeyboardButton(text="👤 پروفایل", callback_data="profile")],
-        [InlineKeyboardButton(text="💰 درآمد", callback_data="income")]
-    ]
-    if is_owner:
-        kb.append([InlineKeyboardButton(text="👑 پنل مالک", callback_data="owner")])
-    return InlineKeyboardMarkup(inline_keyboard=kb)
