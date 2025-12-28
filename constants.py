@@ -8,12 +8,14 @@ RANKS = [
     ("سرگرد", 600),
     ("سرهنگ", 1200),
     ("سپهبد", 5000),
-    ("ارتشبد", 15000)
+    ("ارتشبد", 15000),
 ]
 
-def calculate_rank(xp: int):
-    current = RANKS[0][0]
-    for rank, need in RANKS:
-        if xp >= need:
-            current = rank
-    return current
+CITIES = ["لس انجلس", "میسی سیپی", "بابل", "تهران"]
+
+STARTER_ITEMS = {
+    "ژ3": 10,
+    "تیر ژ3": 100,
+    "پراید 98": 1,
+    "خانه آپارتمانی": 1
+}
