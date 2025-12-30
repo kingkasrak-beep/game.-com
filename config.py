@@ -1,7 +1,5 @@
 import os
 
-API_TOKEN = os.getenv("API_TOKEN")
-if not API_TOKEN:
-    raise RuntimeError("API_TOKEN is not set")
+API_TOKEN = "8500072358:AAGSlcN6u3B-QvovDLTulLWIgVjLWmlS2bo"
 
 OWNER_ID = 6321580395
